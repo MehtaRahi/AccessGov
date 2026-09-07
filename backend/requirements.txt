@@ -1,0 +1,17 @@
+fastapi==0.104.1
+uvicorn==0.24.0
+pydantic==2.5.2
+requests==2.31.0
+beautifulsoup4==4.12.2
+langchain
+langchain-community
+langchain-core
+chromadb
+PyMuPDF
+python-docx
+psycopg2-binary
+sqlalchemy
+minio
+mlflow
+ragas
+sentence-transformers
