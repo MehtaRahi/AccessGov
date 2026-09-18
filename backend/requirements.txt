@@ -6,6 +6,7 @@ beautifulsoup4==4.12.2
 langchain
 langchain-community
 langchain-core
+langchain-huggingface
 chromadb
 PyMuPDF
 python-docx
@@ -15,3 +16,4 @@ minio
 mlflow
 ragas
 sentence-transformers
+ollama

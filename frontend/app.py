@@ -67,17 +67,49 @@ def main():
 
         with st.chat_message("assistant"):
             message_placeholder = st.empty()
+            
+            mode_str = "normal"
+            if eli5_mode:
+                mode_str = "eli5"
+            elif wizard_mode:
+                mode_str = "wizard"
+
+            # Connect to backend
+            try:
+                import requests
+                # Use docker network host 'backend' or fallback to localhost
+                # Assuming this runs in Docker Compose, the backend is reachable at http://backend:8000
+                api_url = "http://backend:8000/api/chat"
+                
+                response = requests.post(
+                    api_url, 
+                    json={"query": prompt, "mode": mode_str},
+                    timeout=30
+                )
+                
+                if response.status_code == 200:
+                    backend_response = response.json().get("answer", "No answer received.")
+                else:
+                    backend_response = f"Backend Error: {response.status_code}"
+            except requests.exceptions.RequestException as e:
+                # Fallback to localhost if not in docker
+                try:
+                    api_url = "http://localhost:8001/api/chat"
+                    response = requests.post(
+                        api_url, 
+                        json={"query": prompt, "mode": mode_str},
+                        timeout=30
+                    )
+                    if response.status_code == 200:
+                        backend_response = response.json().get("answer", "No answer received.")
+                    else:
+                        backend_response = f"Backend Error: {response.status_code}"
+                except requests.exceptions.RequestException:
+                    backend_response = f"Could not connect to the backend server. Is it running? Error details: {e}"
+
+            # Simulate streaming the real response
             full_response = ""
-            
-            # Change mock response based on toggles
-            if wizard_mode:
-                simulated_backend_response = f"Wizard Mode Active: Let's fill out your application together. Step 1: Do you currently have a copy of your old ID?"
-            elif eli5_mode:
-                simulated_backend_response = f"Simple Explanation: To get this done, you just need to bring your birth certificate and a photo to the office! It's very easy."
-            else:
-                simulated_backend_response = f"This is a placeholder response for your question: '{prompt}'. Once we connect the FastAPI backend, I will retrieve the official procedure here."
-            
-            for chunk in simulated_backend_response.split():
+            for chunk in backend_response.split():
                 full_response += chunk + " "
                 time.sleep(0.05)
                 message_placeholder.markdown(full_response + "▌", unsafe_allow_html=True)
@@ -87,9 +119,6 @@ def main():
             # Add TTS placeholder
             final_output += """<div class='tts-button'>▶ Play Audio (Text-to-Speech)</div>"""
             
-            if not eli5_mode and not wizard_mode:
-                final_output += """<div class="citation-box"><b>Sources:</b><br>1. Aadhaar Handbook 2026 (Page 12)<br>2. IT Rules 2026 (Section 3)</div>"""
-                
             message_placeholder.markdown(final_output, unsafe_allow_html=True)
             
         st.session_state.messages.append({"role": "assistant", "content": final_output})
