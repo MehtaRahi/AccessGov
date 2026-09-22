@@ -17,3 +17,10 @@ mlflow
 ragas
 sentence-transformers
 ollama
+PyJWT
+passlib
+bcrypt
+langchain-openai
+nltk
+rouge-score
+apscheduler

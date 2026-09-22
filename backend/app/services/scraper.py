@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import os
 import json
 import logging
+from urllib.parse import urljoin
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -43,6 +44,67 @@ class GovScraper:
         except requests.RequestException as e:
             logger.error(f"Failed to scrape {url}: {e}")
             return None
+
+    def download_pdfs_from_url(self, url: str, archive_dir: str, limit: int = 3):
+        """Scrapes a URL for PDF links and downloads them if not already archived."""
+        logger.info(f"Scanning {url} for PDFs...")
+        try:
+            response = requests.get(url, headers=self.headers, timeout=15, verify=False)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            links = soup.find_all('a', href=True)
+            
+            downloaded = 0
+            for link in links:
+                if downloaded >= limit:
+                    logger.info(f"Reached download limit of {limit} PDFs. Stopping scrape.")
+                    break
+                    
+                href = link['href']
+                if href.lower().endswith('.pdf'):
+                    # Handle relative URLs
+                    if href.startswith('/'):
+                        pdf_url = urljoin(url, href)
+                    elif not href.startswith('http'):
+                        # Could be relative without slash, e.g. "docs/file.pdf"
+                        pdf_url = urljoin(url, href)
+                    else:
+                        pdf_url = href
+                        
+                    filename = pdf_url.split('/')[-1]
+                    # Check if it exists in raw
+                    raw_path = os.path.join(self.output_dir, filename)
+                    
+                    # Check archive dir (archive filenames have timestamp prepended)
+                    is_archived = False
+                    if os.path.exists(archive_dir):
+                        for arch_file in os.listdir(archive_dir):
+                            if arch_file.endswith(filename):
+                                is_archived = True
+                                break
+                    
+                    if os.path.exists(raw_path) or is_archived:
+                        logger.info(f"Skipping already downloaded/archived PDF: {filename}")
+                        continue
+                        
+                    # Download PDF
+                    logger.info(f"Downloading new PDF: {filename}")
+                    try:
+                        pdf_res = requests.get(pdf_url, headers=self.headers, timeout=30, verify=False)
+                        pdf_res.raise_for_status()
+                        with open(raw_path, 'wb') as f:
+                            f.write(pdf_res.content)
+                        downloaded += 1
+                    except Exception as e:
+                        logger.error(f"Failed to download {pdf_url}: {e}")
+                        
+            logger.info(f"Successfully downloaded {downloaded} new PDFs from {url}")
+            return downloaded
+            
+        except Exception as e:
+            logger.error(f"Failed to scan {url} for PDFs: {e}")
+            return 0
 
 if __name__ == "__main__":
     import urllib3

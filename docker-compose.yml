@@ -14,11 +14,12 @@ services:
       - chromadb
 
   frontend:
-    build: ./frontend
+    build: ./frontend_node
     ports:
       - "8502:8502"
     volumes:
-      - ./frontend:/app
+      - ./frontend_node:/app
+      - /app/node_modules
     depends_on:
       - backend
 
