@@ -1,6 +1,14 @@
-FROM python:3.11-slim
+FROM node:20-alpine
+
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+
+# We mount volume at runtime for fast dev, but we can copy package.json first
+COPY package.json ./
+
+RUN npm install
+
 COPY . .
-CMD ["streamlit", "run", "app.py", "--server.port", "8502", "--server.address", "0.0.0.0"]
+
+EXPOSE 8502
+
+CMD ["npm", "run", "dev", "--", "--host"]

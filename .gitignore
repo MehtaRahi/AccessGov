@@ -4,4 +4,4 @@ __pycache__/
 .env
 .DS_Store
 data/
-frontend_node/node_modules/
+frontend/node_modules/
