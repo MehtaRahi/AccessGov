@@ -1,0 +1,12 @@
+{
+  "seed_urls": [
+    "https://www.desw.gov.in/en",
+    "https://www.india.gov.in",
+    "https://www.myscheme.gov.in",
+    "https://www.mygov.in",
+    "https://www.niti.gov.in",
+    "https://scholarships.gov.in"
+  ],
+  "max_depth": 1,
+  "download_limit": 5
+}

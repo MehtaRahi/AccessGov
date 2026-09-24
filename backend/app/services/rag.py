@@ -57,6 +57,7 @@ class RAGPipeline:
                 "You are AccessGov, an AI assistant for government services. "
                 "Answer the user's question accurately using ONLY the provided context. "
                 "Do NOT use generic prefixes like 'Based on the context, I can answer your question.' Start your answer directly. "
+                "CRITICAL: If the retrieved context contains conflicting information or multiple versions of a policy, you MUST act as a conflict-resolution judge. Analyze dates, timestamps, or version numbers within the context to prioritize the most recent information. Explicitly inform the user if an older policy was superseded by a newer one. "
                 "If the answer is not in the context, say you don't know and do not guess.\n\n"
             )
             

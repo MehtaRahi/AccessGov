@@ -6,10 +6,7 @@ from app.services.document_parser import DocumentParser
 from app.services.vector_store import VectorStoreManager
 from app.services.scraper import GovScraper
 
-# Placeholder URLs to scrape for new PDFs
-SEED_URLS = [
-    "https://www.meity.gov.in/content/notifications" 
-]
+# Config will be loaded dynamically
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -23,6 +20,7 @@ def run_pipeline():
     4. Moves processed files to data/archive to prevent duplicate ingestion
     """
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../data"))
+    config_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../config/crawler_config.json"))
     raw_dir = os.path.join(base_dir, "raw")
     processed_dir = os.path.join(base_dir, "processed")
     archive_dir = os.path.join(base_dir, "archive")
@@ -31,11 +29,26 @@ def run_pipeline():
     os.makedirs(raw_dir, exist_ok=True)
     os.makedirs(archive_dir, exist_ok=True)
 
+    # Load dynamic config
+    seed_urls = []
+    max_depth = 1
+    download_limit = 5
+    if os.path.exists(config_path):
+        import json
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                seed_urls = config.get("seed_urls", [])
+                max_depth = config.get("max_depth", 1)
+                download_limit = config.get("download_limit", 5)
+        except Exception as e:
+            logger.error(f"Failed to read config: {e}")
+
     # 1. Scrape for new PDFs from seed URLs
     logger.info(f"[{datetime.datetime.now()}] Data Pipeline: Starting web scraper for seed URLs...")
     scraper = GovScraper(output_dir=raw_dir)
-    for url in SEED_URLS:
-        scraper.download_pdfs_from_url(url, archive_dir=archive_dir)
+    for url in seed_urls:
+        scraper.download_pdfs_from_url(url, archive_dir=archive_dir, limit=download_limit, max_depth=max_depth)
 
     # 2. Check if there are any files to process
     files_to_process = [f for f in os.listdir(raw_dir) if f.lower().endswith(('.pdf', '.txt'))]

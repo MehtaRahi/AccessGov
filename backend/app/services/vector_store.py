@@ -26,6 +26,16 @@ class VectorStoreManager:
         )
         print(f"✅ Successfully connected to ChromaDB at {chroma_host}:{chroma_port}", flush=True)
 
+    def delete_document_chunks(self, source_filename: str):
+        """Purges all chunks associated with a specific source document."""
+        try:
+            logger.info(f"Purging old chunks for {source_filename} from ChromaDB...")
+            collection = self.vector_store._collection
+            collection.delete(where={"source": source_filename})
+            logger.info(f"✅ Successfully deleted old chunks for {source_filename}.")
+        except Exception as e:
+            logger.error(f"Failed to delete chunks for {source_filename}: {e}")
+
     def ingest_data(self, json_path: str):
         if self.vector_store is None:
             raise ValueError("❌ Vector store is not initialized.")
@@ -35,6 +45,11 @@ class VectorStoreManager:
             chunks = json.load(f)
         
         if chunks:
+            # 1. Purge old chunks for any documents we are about to ingest
+            unique_sources = set(c.get("source") for c in chunks if c.get("source"))
+            for source in unique_sources:
+                self.delete_document_chunks(source)
+
             print(f"🚀 Ingesting {len(chunks)} chunks into ChromaDB in batches of 5... this may take a while.", flush=True)
             batch_size = 5
             total_batches = (len(chunks) + batch_size - 1) // batch_size

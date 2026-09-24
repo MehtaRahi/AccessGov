@@ -34,6 +34,9 @@ Base.metadata.create_all(bind=engine)
 from app.api.auth import router as auth_router
 app.include_router(auth_router, prefix="/api/auth")
 
+from app.api.admin import router as admin_router
+app.include_router(admin_router, prefix="/api/admin")
+
 app.include_router(api_router, prefix="/api")
 
 from apscheduler.schedulers.background import BackgroundScheduler
