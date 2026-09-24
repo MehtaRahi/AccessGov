@@ -1,18 +1,16 @@
-import { useState, useEffect, useRef } from 'react'
-import { Mic, Send, Volume2, PlusCircle, LogOut, Settings, X } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { X } from 'lucide-react'
+import AdminDashboard from './components/AdminDashboard'
+import LoginScreen from './components/LoginScreen'
+import Sidebar from './components/Sidebar'
+import ChatArea from './components/ChatArea'
 
-// Same fallback logic as Streamlit
-const BACKEND_URL = "http://localhost:8001"; // When running via Vite Dev Server. In production/Docker it's exposed on 8001 on the host for browser access. Wait, the browser hits the backend directly!
-// Yes, the browser is on the host machine, so it must hit localhost:8001 (which maps to backend:8000).
+const BACKEND_URL = "http://localhost:8001"; 
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || null)
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')) || null)
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [isRegister, setIsRegister] = useState(false)
-  const [name, setName] = useState('')
-  const [isGuest, setIsGuest] = useState(false) // Track if user skipped login
+  const [isGuest, setIsGuest] = useState(false) 
 
   const [chats, setChats] = useState([])
   const [sessionId, setSessionId] = useState(null)
@@ -26,7 +24,8 @@ function App() {
   const [isDarkMode, setIsDarkMode] = useState(true)
   const [isDyslexiaFont, setIsDyslexiaFont] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [textSize, setTextSize] = useState('normal') // normal, large, xlarge
+  const [isAdminOpen, setIsAdminOpen] = useState(false)
+  const [textSize, setTextSize] = useState('normal') 
   const [highContrast, setHighContrast] = useState(false)
   const [colorblindMode, setColorblindMode] = useState('none')
   const [readingMask, setReadingMask] = useState(false)
@@ -35,8 +34,6 @@ function App() {
   const [simpleLanguage, setSimpleLanguage] = useState(false)
   
   const [mouseY, setMouseY] = useState(0)
-
-  const messagesEndRef = useRef(null)
 
   useEffect(() => {
     if (isDarkMode) document.body.classList.remove('light-mode')
@@ -71,13 +68,8 @@ function App() {
   }, [readingMask])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
-
-  useEffect(() => {
     if (user && token) {
       fetchChats()
-      // Ideally fetch prefs from /api/users/{user_id} here
     }
   }, [user, token])
 
@@ -102,28 +94,11 @@ function App() {
     }
   }
 
-  const handleAuth = async (e) => {
-    e.preventDefault()
-    const url = `${BACKEND_URL}/api/auth/${isRegister ? 'register' : 'login'}`
-    const payload = isRegister ? { email, password, name } : { email, password }
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setToken(data.access_token)
-        setUser({ user_id: data.user_id, name: data.name })
-        localStorage.setItem('token', data.access_token)
-        localStorage.setItem('user', JSON.stringify({ user_id: data.user_id, name: data.name }))
-      } else {
-        alert("Authentication failed")
-      }
-    } catch (error) {
-      alert("Network error")
-    }
+  const handleLogin = (data) => {
+    setToken(data.access_token)
+    setUser({ user_id: data.user_id, name: data.name })
+    localStorage.setItem('token', data.access_token)
+    localStorage.setItem('user', JSON.stringify({ user_id: data.user_id, name: data.name }))
   }
 
   const logout = () => {
@@ -148,7 +123,6 @@ function App() {
     setMessages(newMsgs)
     setInput('')
 
-    // history logic - get last 4
     const history = newMsgs.length > 2 ? newMsgs.slice(1, -1).slice(-4) : []
 
     let queryText = text
@@ -181,16 +155,15 @@ function App() {
     }
   }
 
-  // Web Speech API for TTS
   const speak = (text) => {
     const utterance = new SpeechSynthesisUtterance(text)
-    window.speechSynthesis.cancel() // cancel current
+    window.speechSynthesis.cancel() 
     window.speechSynthesis.speak(utterance)
   }
 
-  // Web Speech API for STT
+  let recognition = null;
   const toggleRecording = () => {
-    if (isRecording) return // Can't manually stop native easily without ref
+    if (isRecording) return 
     
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SpeechRecognition) {
@@ -198,7 +171,7 @@ function App() {
       return
     }
 
-    const recognition = new SpeechRecognition()
+    recognition = new SpeechRecognition()
     recognition.continuous = false
     recognition.interimResults = false
 
@@ -208,45 +181,23 @@ function App() {
 
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript
-      sendMessage(transcript) // auto send
+      sendMessage(transcript) 
     }
 
     recognition.start()
   }
 
-  // --- FULL PAGE LOGIN SCREEN ---
-  if (!user && !isGuest) {
-    return (
-      <div className="login-screen">
-        <div className="login-card glass-panel">
-          <h1 style={{ color: 'var(--accent)', marginBottom: '10px' }}>AccessGov</h1>
-          <p style={{ color: 'var(--text-muted)', marginBottom: '30px' }}>Your AI Government Assistant</p>
-
-          <form className="auth-form" onSubmit={handleAuth} style={{ width: '100%' }}>
-            {isRegister && <input className="input-field" placeholder="Full Name" value={name} onChange={e => setName(e.target.value)} required />}
-            <input className="input-field" type="email" placeholder="Email Address" value={email} onChange={e => setEmail(e.target.value)} required />
-            <input className="input-field" type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required />
-            
-            <button className="btn-primary" type="submit" style={{ marginTop: '10px' }}>
-              {isRegister ? 'Create Account' : 'Sign In'}
-            </button>
-          </form>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px', width: '100%' }}>
-            <button className="btn-outline" type="button" onClick={() => setIsRegister(!isRegister)}>
-              {isRegister ? 'Already have an account? Sign In' : 'Need an account? Register'}
-            </button>
-            <div className="divider-text"><span>or</span></div>
-            <button className="btn-outline" type="button" onClick={() => setIsGuest(true)}>
-              Continue as Guest
-            </button>
-          </div>
-        </div>
-      </div>
-    )
+  const stopRecording = () => {
+      if(recognition) {
+          recognition.stop()
+      }
+      setIsRecording(false)
   }
 
-  // --- MAIN APP (Authenticated or Guest) ---
+  if (!user && !isGuest) {
+    return <LoginScreen onLogin={handleLogin} onGuest={() => setIsGuest(true)} BACKEND_URL={BACKEND_URL} />
+  }
+
   return (
     <div className="app-container">
       {readingMask && (
@@ -258,44 +209,18 @@ function App() {
         />
       )}
       
-      {/* SIDEBAR */}
-      <div className="sidebar">
-        <h1>AccessGov</h1>
-        <p>AI Government Assistant</p>
+      <Sidebar 
+        user={user}
+        chats={chats}
+        onLogout={logout}
+        onNewChat={newChat}
+        onLoadChat={loadChat}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenAdmin={() => setIsAdminOpen(true)}
+        onGuestExit={() => setIsGuest(false)}
+      />
 
-        {!user ? (
-          <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-            <p style={{ fontSize: '14px', marginBottom: '10px', color: 'var(--text-muted)' }}>Browsing as Guest</p>
-            <button className="btn-outline" style={{ width: '100%' }} onClick={() => setIsGuest(false)}>Sign In to Save Chats</button>
-          </div>
-        ) : (
-          <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <span style={{ fontWeight: 'bold' }}>{user.name}</span>
-              <button onClick={logout} className="btn-outline" style={{ padding: '5px' }} title="Logout">
-                <LogOut size={16}/>
-              </button>
-            </div>
-            <button className="btn-primary" onClick={newChat} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
-              <PlusCircle size={18} /> New Chat
-            </button>
-
-            <div className="chat-history">
-              {chats.map(c => (
-                <button key={c.id} className="chat-session-btn" onClick={() => loadChat(c.id)}>
-                  {c.title}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-
-        <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'center' }}>
-          <button className="btn-outline" style={{ width: '100%', display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'center' }} onClick={() => setIsSettingsOpen(true)}>
-            <Settings size={18} /> Settings & Accessibility
-          </button>
-        </div>
-      </div>
+      {isAdminOpen && <AdminDashboard onClose={() => setIsAdminOpen(false)} />}
 
       {isSettingsOpen && (
         <div className="modal-overlay" onClick={() => setIsSettingsOpen(false)}>
@@ -360,39 +285,17 @@ function App() {
         </div>
       )}
 
-      {/* CHAT AREA */}
-      <div className="chat-area">
-        <div className="messages">
-          {messages.map((m, i) => (
-            <div key={i} className={`message ${m.role}`}>
-              {/* Note: In a real app we'd use react-markdown here instead of raw text, but raw text works for prototype */}
-              <div style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
-              {m.role === 'assistant' && (
-                <button className="tts-btn" onClick={() => speak(m.content)}>
-                  <Volume2 size={14} /> Play Audio
-                </button>
-              )}
-            </div>
-          ))}
-          <div ref={messagesEndRef} />
-        </div>
-
-        <div className="input-area">
-          <input 
-            className="chat-input" 
-            placeholder="Type your question..." 
-            value={input} 
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && sendMessage()}
-          />
-          <button className={`mic-btn ${isRecording ? 'recording' : ''}`} onClick={toggleRecording} aria-label={isRecording ? "Stop voice input" : "Start voice input"}>
-            <Mic size={20} />
-          </button>
-          <button className="send-btn" onClick={() => sendMessage()} aria-label="Send message">
-            <Send size={20} />
-          </button>
-        </div>
-      </div>
+      <ChatArea 
+        currentChat={sessionId}
+        messages={messages}
+        input={input}
+        setInput={setInput}
+        isRecording={isRecording}
+        handleSendMessage={() => sendMessage()}
+        handleStartRecording={toggleRecording}
+        handleStopRecording={stopRecording}
+        handlePlayTTS={speak}
+      />
     </div>
   )
 }
