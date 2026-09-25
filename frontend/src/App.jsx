@@ -2,15 +2,16 @@ import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import AdminDashboard from './components/AdminDashboard'
 import LoginScreen from './components/LoginScreen'
-import Sidebar from './components/Sidebar'
+import NavRail from './components/NavRail'
+import HistoryPanel from './components/HistoryPanel'
 import ChatArea from './components/ChatArea'
 
-const BACKEND_URL = "http://localhost:8001"; 
+const BACKEND_URL = "http://localhost:8001";
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || null)
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')) || null)
-  const [isGuest, setIsGuest] = useState(false) 
+  const [isGuest, setIsGuest] = useState(false)
 
   const [chats, setChats] = useState([])
   const [sessionId, setSessionId] = useState(null)
@@ -20,21 +21,24 @@ function App() {
   const [input, setInput] = useState('')
   const [isRecording, setIsRecording] = useState(false)
 
+  // UI States
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [isAdminOpen, setIsAdminOpen] = useState(false)
+
   // Accessibility States
   const [isDarkMode, setIsDarkMode] = useState(true)
   const [isDyslexiaFont, setIsDyslexiaFont] = useState(false)
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [isAdminOpen, setIsAdminOpen] = useState(false)
-  const [textSize, setTextSize] = useState('normal') 
+  const [textSize, setTextSize] = useState('normal')
   const [highContrast, setHighContrast] = useState(false)
   const [colorblindMode, setColorblindMode] = useState('none')
   const [readingMask, setReadingMask] = useState(false)
   const [reducedMotion, setReducedMotion] = useState(false)
   const [textOnlyMode, setTextOnlyMode] = useState(false)
   const [simpleLanguage, setSimpleLanguage] = useState(false)
-  
   const [mouseY, setMouseY] = useState(0)
 
+  // Accessibility class management
   useEffect(() => {
     if (isDarkMode) document.body.classList.remove('light-mode')
     else document.body.classList.add('light-mode')
@@ -49,7 +53,7 @@ function App() {
     htmlClasses.remove('text-large', 'text-xlarge')
     if (textSize === 'large') htmlClasses.add('text-large')
     if (textSize === 'xlarge') htmlClasses.add('text-xlarge')
-    
+
     if (reducedMotion) document.body.classList.add('reduced-motion')
     else document.body.classList.remove('reduced-motion')
 
@@ -68,19 +72,16 @@ function App() {
   }, [readingMask])
 
   useEffect(() => {
-    if (user && token) {
-      fetchChats()
-    }
+    if (user && token) fetchChats()
   }, [user, token])
 
+  // API calls
   const fetchChats = async () => {
     try {
       const res = await fetch(`${BACKEND_URL}/api/chats/${user.user_id}`)
       const data = await res.json()
       setChats(data)
-    } catch (e) {
-      console.error(e)
-    }
+    } catch (e) { console.error(e) }
   }
 
   const loadChat = async (id) => {
@@ -89,9 +90,8 @@ function App() {
       const data = await res.json()
       setSessionId(id)
       setMessages(data.messages.length ? data.messages : messages)
-    } catch (e) {
-      console.error(e)
-    }
+      setIsHistoryOpen(false)
+    } catch (e) { console.error(e) }
   }
 
   const handleLogin = (data) => {
@@ -105,6 +105,7 @@ function App() {
     setToken(null)
     setUser(null)
     setSessionId(null)
+    setIsHistoryOpen(false)
     setMessages([{ role: 'assistant', content: 'Hello! I am your AccessGov assistant. How can I help you today?' }])
     localStorage.removeItem('token')
     localStorage.removeItem('user')
@@ -151,91 +152,97 @@ function App() {
         if (user) fetchChats()
       }
     } catch (e) {
-      setMessages([...newMsgs, { role: 'assistant', content: 'Connection Error.' }])
+      setMessages([...newMsgs, { role: 'assistant', content: 'Connection error. Please check that the backend is running.' }])
     }
   }
 
+  // TTS
   const speak = (text) => {
     const utterance = new SpeechSynthesisUtterance(text)
-    window.speechSynthesis.cancel() 
+    window.speechSynthesis.cancel()
     window.speechSynthesis.speak(utterance)
   }
 
-  let recognition = null;
+  // STT
+  let recognition = null
   const toggleRecording = () => {
-    if (isRecording) return 
-    
+    if (isRecording) return
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SpeechRecognition) {
       alert("Voice input is not supported in this browser.")
       return
     }
-
     recognition = new SpeechRecognition()
     recognition.continuous = false
     recognition.interimResults = false
-
     recognition.onstart = () => setIsRecording(true)
     recognition.onend = () => setIsRecording(false)
     recognition.onerror = () => setIsRecording(false)
-
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript
-      sendMessage(transcript) 
+      sendMessage(transcript)
     }
-
     recognition.start()
   }
 
   const stopRecording = () => {
-      if(recognition) {
-          recognition.stop()
-      }
-      setIsRecording(false)
+    if (recognition) recognition.stop()
+    setIsRecording(false)
   }
 
+  // === Login Gate ===
   if (!user && !isGuest) {
     return <LoginScreen onLogin={handleLogin} onGuest={() => setIsGuest(true)} BACKEND_URL={BACKEND_URL} />
   }
 
+  // === Main App ===
   return (
-    <div className="app-container">
+    <div className="app-layout">
       {readingMask && (
-        <div 
+        <div
           className="reading-mask"
-          style={{
-            background: `radial-gradient(circle 800px at 50% ${mouseY}px, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.8) 15%)`
-          }}
+          style={{ background: `radial-gradient(circle 800px at 50% ${mouseY}px, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.8) 15%)` }}
         />
       )}
-      
-      <Sidebar 
+
+      <NavRail
         user={user}
-        chats={chats}
-        onLogout={logout}
-        onNewChat={newChat}
-        onLoadChat={loadChat}
+        activeView="chat"
+        isHistoryOpen={isHistoryOpen}
+        onToggleHistory={() => setIsHistoryOpen(!isHistoryOpen)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenAdmin={() => setIsAdminOpen(true)}
+        onLogout={logout}
         onGuestExit={() => setIsGuest(false)}
       />
+
+      {isHistoryOpen && (
+        <HistoryPanel
+          chats={chats}
+          onLoadChat={loadChat}
+          onNewChat={() => { newChat(); setIsHistoryOpen(false); }}
+          onClose={() => setIsHistoryOpen(false)}
+        />
+      )}
 
       {isAdminOpen && <AdminDashboard onClose={() => setIsAdminOpen(false)} />}
 
       {isSettingsOpen && (
         <div className="modal-overlay" onClick={() => setIsSettingsOpen(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal__header">
               <h2>Settings</h2>
-              <button className="close-btn" aria-label="Close settings" onClick={() => setIsSettingsOpen(false)}><X size={24}/></button>
+              <button className="modal__close" aria-label="Close settings" onClick={() => setIsSettingsOpen(false)}>
+                <X size={20} />
+              </button>
             </div>
-            
-            <div className="settings">
-              <div className="toggle-row">
+
+            <div className="settings-list">
+              <div className="settings-row">
                 <span>Translate App</span>
                 <div id="google_translate_element"></div>
               </div>
-              <div className="toggle-row">
+              <div className="settings-row">
                 <span>Text Size</span>
                 <select className="select-field" value={textSize} onChange={e => setTextSize(e.target.value)} aria-label="Select text size">
                   <option value="normal">Normal</option>
@@ -243,7 +250,7 @@ function App() {
                   <option value="xlarge">Extra Large</option>
                 </select>
               </div>
-              <div className="toggle-row">
+              <div className="settings-row">
                 <span>Colorblind Filter</span>
                 <select className="select-field" value={colorblindMode} onChange={e => setColorblindMode(e.target.value)} aria-label="Select colorblind filter">
                   <option value="none">None</option>
@@ -252,41 +259,68 @@ function App() {
                   <option value="tritanopia">Tritanopia (Blue)</option>
                 </select>
               </div>
-              <div className="toggle-row">
-                <span>Always Use Simple Language</span>
-                <input type="checkbox" checked={simpleLanguage} onChange={e => setSimpleLanguage(e.target.checked)} aria-label="Toggle simple language" />
+              <div className="settings-row">
+                <span>Simple Language</span>
+                <label className="toggle">
+                  <input type="checkbox" checked={simpleLanguage} onChange={e => setSimpleLanguage(e.target.checked)} />
+                  <span className="toggle__track"></span>
+                  <span className="toggle__thumb"></span>
+                </label>
               </div>
-              <div className="toggle-row">
-                <span>Reading Mask / Focus Ruler</span>
-                <input type="checkbox" checked={readingMask} onChange={e => setReadingMask(e.target.checked)} aria-label="Toggle reading mask" />
+              <div className="settings-row">
+                <span>Reading Mask</span>
+                <label className="toggle">
+                  <input type="checkbox" checked={readingMask} onChange={e => setReadingMask(e.target.checked)} />
+                  <span className="toggle__track"></span>
+                  <span className="toggle__thumb"></span>
+                </label>
               </div>
-              <div className="toggle-row">
+              <div className="settings-row">
                 <span>Reduced Motion</span>
-                <input type="checkbox" checked={reducedMotion} onChange={e => setReducedMotion(e.target.checked)} aria-label="Toggle reduced motion" />
+                <label className="toggle">
+                  <input type="checkbox" checked={reducedMotion} onChange={e => setReducedMotion(e.target.checked)} />
+                  <span className="toggle__track"></span>
+                  <span className="toggle__thumb"></span>
+                </label>
               </div>
-              <div className="toggle-row">
-                <span>Text-Only (Screen Reader)</span>
-                <input type="checkbox" checked={textOnlyMode} onChange={e => setTextOnlyMode(e.target.checked)} aria-label="Toggle text only mode" />
+              <div className="settings-row">
+                <span>Text-Only Mode</span>
+                <label className="toggle">
+                  <input type="checkbox" checked={textOnlyMode} onChange={e => setTextOnlyMode(e.target.checked)} />
+                  <span className="toggle__track"></span>
+                  <span className="toggle__thumb"></span>
+                </label>
               </div>
-              <div className="toggle-row">
-                <span>High Contrast Mode</span>
-                <input type="checkbox" checked={highContrast} onChange={e => setHighContrast(e.target.checked)} aria-label="Toggle high contrast" />
+              <div className="settings-row">
+                <span>High Contrast</span>
+                <label className="toggle">
+                  <input type="checkbox" checked={highContrast} onChange={e => setHighContrast(e.target.checked)} />
+                  <span className="toggle__track"></span>
+                  <span className="toggle__thumb"></span>
+                </label>
               </div>
-              <div className="toggle-row">
+              <div className="settings-row">
                 <span>Dark Mode</span>
-                <input type="checkbox" checked={isDarkMode} onChange={e => setIsDarkMode(e.target.checked)} aria-label="Toggle dark mode" />
+                <label className="toggle">
+                  <input type="checkbox" checked={isDarkMode} onChange={e => setIsDarkMode(e.target.checked)} />
+                  <span className="toggle__track"></span>
+                  <span className="toggle__thumb"></span>
+                </label>
               </div>
-              <div className="toggle-row">
+              <div className="settings-row">
                 <span>Dyslexia Font</span>
-                <input type="checkbox" checked={isDyslexiaFont} onChange={e => setIsDyslexiaFont(e.target.checked)} aria-label="Toggle dyslexia font" />
+                <label className="toggle">
+                  <input type="checkbox" checked={isDyslexiaFont} onChange={e => setIsDyslexiaFont(e.target.checked)} />
+                  <span className="toggle__track"></span>
+                  <span className="toggle__thumb"></span>
+                </label>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      <ChatArea 
-        currentChat={sessionId}
+      <ChatArea
         messages={messages}
         input={input}
         setInput={setInput}
@@ -295,6 +329,7 @@ function App() {
         handleStartRecording={toggleRecording}
         handleStopRecording={stopRecording}
         handlePlayTTS={speak}
+        onSuggestionClick={(query) => sendMessage(query)}
       />
     </div>
   )
