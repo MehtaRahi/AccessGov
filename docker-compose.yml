@@ -8,6 +8,8 @@ services:
       - ./data:/data
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - LLM_PROVIDER=groq
+      - GROQ_API_KEY=${GROQ_API_KEY}
     depends_on:
       - postgres
       - minio

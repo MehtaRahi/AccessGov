@@ -1,11 +1,6 @@
 import os
 import requests
 
-# Strong SSL Bypass for HuggingFace & Requests
-os.environ["CURL_CA_BUNDLE"] = ""
-os.environ["REQUESTS_CA_BUNDLE"] = ""
-os.environ["HF_HUB_DISABLE_SSL_VERIFY"] = "1"
-
 requests.packages.urllib3.disable_warnings()
 old_request = requests.Session.request
 def new_request(*args, **kwargs):
@@ -22,14 +17,35 @@ app = FastAPI(title="AccessGov API", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-from app.db.session import engine
-from app.db.models import Base
-Base.metadata.create_all(bind=engine)
+import time
+
+# Database init with retry (postgres may take a moment to be ready)
+for attempt in range(5):
+    try:
+        from app.db.session import engine
+        from app.db.models import Base
+        Base.metadata.create_all(bind=engine)
+        
+        # Add missing 'title' column if it doesn't exist (since create_all doesn't alter tables)
+        try:
+            from sqlalchemy import text
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE chats ADD COLUMN title VARCHAR DEFAULT 'New Chat';"))
+                conn.commit()
+        except Exception:
+            pass # Column already exists
+            
+        break
+    except Exception as e:
+        if attempt < 4:
+            time.sleep(2)
+        else:
+            print(f"⚠️ Database connection failed after 5 attempts: {e}", flush=True)
 
 from app.api.auth import router as auth_router
 app.include_router(auth_router, prefix="/api/auth")

@@ -11,8 +11,14 @@ import datetime
 
 router = APIRouter()
 
-# Initialize RAG pipeline
-rag_pipeline = RAGPipeline()
+# Lazy-initialize RAG pipeline (avoids crash if ChromaDB/LLM not ready at import)
+_rag_pipeline = None
+
+def get_rag_pipeline():
+    global _rag_pipeline
+    if _rag_pipeline is None:
+        _rag_pipeline = RAGPipeline()
+    return _rag_pipeline
 
 class QueryRequest(BaseModel):
     query: str
@@ -29,30 +35,31 @@ class QueryResponse(BaseModel):
     metadata: Optional[Dict[str, Any]] = {}
 
 @router.post("/chat", response_model=QueryResponse)
-async def chat_endpoint(req: QueryRequest, db: Session = Depends(get_db)):
-    if req.reset:
-        req.chat_history = []
+def chat_endpoint(req: QueryRequest, db: Session = Depends(get_db)):
+    try:
+        if req.reset:
+            req.chat_history = []
+            
+        answer = get_rag_pipeline().query(req.query, mode=req.mode, chat_history=req.chat_history, detail=req.detail)
         
-    answer = rag_pipeline.query(req.query, mode=req.mode, chat_history=req.chat_history, detail=req.detail)
-    
-    session_id = req.session_id
-    
-    if req.user_id:
-        if session_id:
-            # Append to existing session
-            chat = db.query(Chat).filter(Chat.id == session_id, Chat.user_id == req.user_id).first()
-            if chat:
-                # SQLAlchemy JSON columns need re-assignment to detect changes in lists
-                messages = list(chat.messages)
-                messages.extend([
-                    {"role": "user", "content": req.query, "timestamp": str(datetime.datetime.utcnow())},
-                    {"role": "assistant", "content": answer, "timestamp": str(datetime.datetime.utcnow())}
-                ])
-                chat.messages = messages
-                db.commit()
-            else:
-                # session_id provided but not found, act as if new
-                session_id = None
+        session_id = req.session_id
+        
+        if req.user_id:
+            if session_id:
+                # Append to existing session
+                chat = db.query(Chat).filter(Chat.id == session_id, Chat.user_id == req.user_id).first()
+                if chat:
+                    # SQLAlchemy JSON columns need re-assignment to detect changes in lists
+                    messages = list(chat.messages)
+                    messages.extend([
+                        {"role": "user", "content": req.query, "timestamp": str(datetime.datetime.utcnow())},
+                        {"role": "assistant", "content": answer, "timestamp": str(datetime.datetime.utcnow())}
+                    ])
+                    chat.messages = messages
+                    db.commit()
+                else:
+                    # session_id provided but not found, act as if new
+                    session_id = None
                 
         if not session_id:
             # Create new session
@@ -70,8 +77,12 @@ async def chat_endpoint(req: QueryRequest, db: Session = Depends(get_db)):
             db.commit()
             db.refresh(chat)
             session_id = chat.id
-    
-    return QueryResponse(answer=answer, session_id=session_id, metadata={"detail_requested": req.detail})
+        
+        return QueryResponse(answer=answer, session_id=session_id, metadata={"detail_requested": req.detail})
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Endpoint error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error occurred.")
 
 @router.get("/chats/{user_id}")
 async def get_user_chats(user_id: int, db: Session = Depends(get_db)):

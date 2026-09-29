@@ -227,9 +227,12 @@ function App() {
 
       {isAdminOpen && <AdminDashboard onClose={() => setIsAdminOpen(false)} />}
 
-      {isSettingsOpen && (
-        <div className="modal-overlay" onClick={() => setIsSettingsOpen(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+      <div 
+        className="modal-overlay" 
+        onClick={() => setIsSettingsOpen(false)}
+        style={{ display: isSettingsOpen ? 'flex' : 'none' }}
+      >
+        <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal__header">
               <h2>Settings</h2>
               <button className="modal__close" aria-label="Close settings" onClick={() => setIsSettingsOpen(false)}>
@@ -318,7 +321,6 @@ function App() {
             </div>
           </div>
         </div>
-      )}
 
       <ChatArea
         messages={messages}
